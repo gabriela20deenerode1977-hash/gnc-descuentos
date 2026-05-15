@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validador GNC - Playero</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; }
+        #reader { width: 100%; max-width: 500px; margin: auto; border: 2px solid #00ff00; }
+        .resultado { background: #222; padding: 20px; border-radius: 10px; margin-top: 20px; display: none; }
+        input { width: 80%; padding: 15px; font-size: 20px; margin: 10px 0; border-radius: 5px; border: none; }
+        button { background: #00ff00; color: black; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 5px; cursor: pointer; }
+        .monto-final { color: #00ff00; font-size: 30px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>⛽ Validador GNC</h2>
+    
+    <div id="reader"></div>
+
+    <div id="resultado" class="resultado">
+        <h3 id="patente-detectada"></h3>
+        <p>Monto cargado ($):</p>
+        <input type="number" id="monto" placeholder="Ej: 4000" oninput="calcular()">
+        <div class="monto-final">Total: $<span id="total">0</span></div>
+        <p style="color: #aaa;">Descuento 5% aplicado</p>
+        <br>
+        <button onclick="finalizar()">Confirmar Carga</button>
+    </div>
+
+    <script>
+        function onScanSuccess(decodedText) {
+            // Cuando lee el QR, detiene la cámara y muestra el cobro
+            document.getElementById('patente-detectada').innerText = "Vehículo: " + decodedText;
+            document.getElementById('resultado').style.display = 'block';
+            document.getElementById('reader').style.display = 'none';
+            html5QrcodeScanner.clear();
+        }
+
+        function calcular() {
+            let monto = document.getElementById('monto').value;
+            let total = monto * 0.95; // Aplicamos el 5% de descuento
+            document.getElementById('total').innerText = total.toFixed(2);
+        }
+
+        function finalizar() {
+            alert("Carga registrada con éxito. ¡Cobrar $" + document.getElementById('total').innerText + "!");
+            location.reload(); // Recarga para el siguiente cliente
+        }
+
+        let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+        html5QrcodeScanner.render(onScanSuccess);
+    </script>
+</body>
+</html>
