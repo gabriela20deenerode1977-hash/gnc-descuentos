@@ -1,0 +1,24 @@
+{
+  "name": "gnc-descuentos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gabriela20deenerode1977-hash/gnc-descuentos.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/gabriela20deenerode1977-hash/gnc-descuentos/issues"
+  },
+  "homepage": "https://github.com/gabriela20deenerode1977-hash/gnc-descuentos#readme",
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  }
+}
