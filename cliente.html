@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Ahorro GNC</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; margin: 0; }
+        .contenedor { max-width: 450px; margin: auto; background: #1e1e1e; padding: 25px; border-radius: 15px; border: 1px solid #333; }
+        input { width: 85%; padding: 15px; font-size: 20px; margin: 15px 0; border-radius: 8px; border: 2px solid #333; background: #2d2d2d; color: white; text-align: center; text-transform: uppercase; }
+        button { background: #00ff00; color: black; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 90%; }
+        .box-ahorro { background: #222; border-left: 5px solid #00ff00; padding: 15px; margin-top: 25px; border-radius: 5px; display: none; }
+        .monto { color: #00ff00; font-size: 35px; font-weight: bold; margin: 10px 0; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 10px; border-bottom: 1px solid #333; text-align: center; }
+        th { color: #00ff00; }
+    </style>
+</head>
+<body>
+    <div class="contenedor">
+        <h2>⛽ Consulta tu Ahorro Semanal</h2>
+        <p>Ingresá tu patente para ver cuánto ahorraste con el beneficio del 5% en los últimos 7 días.</p>
+        
+        <input type="text" id="patenteInput" placeholder="Ej: AA123BB o WMK987">
+        <button onclick="consultarAhorro()">CONSULTAR MI AHORRO</button>
+
+        <div id="resultado" class="box-ahorro">
+            <h3 id="res-patente">Patente: </h3>
+            <p>Tu ahorro acumulado esta semana es de:</p>
+            <div class="monto">$<span id="res-monto">0.00</span></div>
+            
+            <h4>📋 Detalle de cargas de la semana:</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Ahorrado</th>
+                        <th>Pagado</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-historial"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Tu IP de la computadora de la caja
+        const IP_DE_LA_COMPU = "192.168.1.96"; 
+
+        function consultarAhorro() {
+            const patente = document.getElementById('patenteInput').value.trim();
+            if(!patente) { alert("Por favor ingresá una patente."); return; }
+
+            fetch(`http://${IP_DE_LA_COMPU}:3000/ahorro-cliente/${patente}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('res-patente').innerText = "Vehículo: " + data.patente;
+                    document.getElementById('res-monto').innerText = data.totalAhorrado;
+                    
+                    const tbody = document.getElementById('tabla-historial');
+                    tbody.innerHTML = '';
+                    
+                    if(data.historial.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="3">No se registran cargas en los últimos 7 días.</td></tr>`;
+                    } else {
+                        data.historial.forEach(c => {
+                            tbody.innerHTML += `<tr>
+                                <td>${c.fecha}</td>
+                                <td style="color:#00ff00;">+$${c.ahorro}</td>
+                                <td>$${c.total}</td>
+                            </tr>`;
+                        });
+                    }
+                    document.getElementById('resultado').style.display = 'block';
+                })
+                .catch(err => {
+                    alert("No se pudo conectar con la caja de la estación. Verifique que el sistema esté activo.");
+                    console.error(err);
+                });
+        }
+    </script>
+</body>
+</html>

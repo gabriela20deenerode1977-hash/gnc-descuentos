@@ -1,83 +1,105 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors'); 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname)); // Sirve los archivos HTML directamente
 
 const ARCHIVO_CSV = path.join(__dirname, 'registro_cargas.csv');
 
-// 1. Recibe los cupones que escanean los playeros desde el celular y los va acumulando
+// 1. Recibe los datos del celular del playero
 app.post('/guardar-carga', (req, res) => {
     try {
         const { patente, monto, total } = req.body;
+        const opcionesFecha = { timeZone: "America/Argentina/Buenos_Aires", year: 'numeric', month: '2-digit', day: '2-digit' };
+        const opcionesHora = { timeZone: "America/Argentina/Buenos_Aires", hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
         
-        // Formatea la fecha y hora actual de Argentina
-        const fecha = new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" });
+        const fechaHoy = new Date().toLocaleDateString("es-AR", opcionesFecha).split('/').reverse().join('-'); 
+        const horaHoy = new Date().toLocaleTimeString("es-AR", opcionesHora);
         const descuento = (parseFloat(monto) * 0.05).toFixed(2);
         
-        // Si es la primera vez que se usa, crea el archivo con los títulos de columna
         if (!fs.existsSync(ARCHIVO_CSV)) {
-            fs.writeFileSync(ARCHIVO_CSV, "sep=,\nFecha y Hora,Patente,Monto Base,Descuento ($),Total Cobrado\n", 'utf8');
+            fs.writeFileSync(ARCHIVO_CSV, "sep=,\nFecha,Hora,Patente,Monto Base,Descuento ($),Total Cobrado\n", 'utf8');
         }
         
-        // Agrega la nueva fila abajo de todo sin borrar lo anterior
-        const nuevaLinea = `"${fecha}","${patente.toUpperCase()}","${parseFloat(monto).toFixed(2)}","${descuento}","${parseFloat(total).toFixed(2)}"\n`;
+        const nuevaLinea = `"${fechaHoy}","${horaHoy}","${patente.toUpperCase().trim()}","${parseFloat(monto).toFixed(2)}","${descuento}","${parseFloat(total).toFixed(2)}"\n`;
         fs.appendFileSync(ARCHIVO_CSV, nuevaLinea, 'utf8');
         
-        console.log(`[OK] Cupón guardado con éxito: ${patente} - Total: $${total}`);
-        res.status(200).json({ status: "success", message: "Carga registrada en el servidor" });
+        console.log(`[CUPÓN REGISTRADO] ${fechaHoy} | Patente: ${patente.toUpperCase().trim()}`);
+        res.status(200).json({ status: "success" });
     } catch (error) {
-        console.error("Error al guardar la carga:", error);
-        res.status(500).json({ status: "error", message: "Error interno del servidor" });
+        console.error(error);
+        res.status(500).json({ status: "error" });
     }
 });
 
-// 2. Ruta para que descargues el Excel unificado y sumado cada vez que lo pidas
+// 2. Ruta de descarga del reporte para vos
 app.get('/descargar-reporte', (req, res) => {
-    if (!fs.existsSync(ARCHIVO_CSV)) {
-        return res.status(404).send("<h3>Aún no hay cupones guardados en el registro acumulativo.</h3>");
-    }
-    
+    if (!fs.existsSync(ARCHIVO_CSV)) return res.status(404).send("No hay datos.");
     try {
-        // Lee el archivo acumulado para calcular las sumas al instante
+        const contenido = fs.readFileSync(ARCHIVO_CSV, 'utf8');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=Reporte_GNC.csv`);
+        res.send(Buffer.from('\uFEFF' + contenido, 'utf-8'));
+    } catch (error) {
+        res.status(500).send("Error.");
+    }
+});
+
+// 3. NUEVA RUTA: Consulta de ahorro semanal para el cliente
+app.get('/ahorro-cliente/:patente', (req, res) => {
+    const patenteBuscada = req.params.patente.toUpperCase().trim();
+    if (!fs.existsSync(ARCHIVO_CSV)) {
+        return res.json({ totalAhorrado: "0.00", historial: [] });
+    }
+
+    try {
         const contenido = fs.readFileSync(ARCHIVO_CSV, 'utf8');
         const lineas = contenido.split('\n');
-        let sumaBase = 0, sumaDesc = 0, sumaTotal = 0;
         
-        // Empieza en la fila 2 para saltear los títulos y sumar solo los números
+        // Calculamos la fecha de hace 7 días
+        const hoy = new Date();
+        const hace7Dias = new Date(hoy.setDate(hoy.getDate() - 7));
+
+        let totalAhorrado = 0;
+        let historial = [];
+
         for (let i = 2; i < lineas.length; i++) {
-            const columnas = lineas[i].split(',');
-            if (columnas.length >= 5) {
-                sumaBase += parseFloat(columnas[2].replace(/"/g, '')) || 0;
-                sumaDesc += parseFloat(columnas[3].replace(/"/g, '')) || 0;
-                sumaTotal += parseFloat(columnas[4].replace(/"/g, '')) || 0;
+            if (!lineas[i].trim()) continue;
+            const columnas = lineas[i].split(',').map(col => col.replace(/"/g, '').trim());
+            
+            if (columnas.length >= 6) {
+                const fechaCarga = columnas[0]; // AAAA-MM-DD
+                const patenteCarga = columnas[2].toUpperCase();
+                const descCarga = parseFloat(columnas[4]) || 0;
+                const totalCarga = parseFloat(columnas[5]) || 0;
+
+                const fechaObjeto = new Date(fechaCarga);
+
+                // Si es la patente del cliente y fue en los últimos 7 días
+                if (patenteCarga === patenteBuscada && fechaObjeto >= hace7Dias) {
+                    totalAhorrado += descCarga;
+                    historial.push({
+                        fecha: fechaCarga,
+                        ahorro: descCarga.toFixed(2),
+                        total: totalCarga.toFixed(2)
+                    });
+                }
             }
         }
-        
-        // Crea una copia temporal para la descarga agregando la fila de TOTALES abajo
-        let reporteFinal = contenido;
-        reporteFinal += `\n"TOTAL GENERAL ACUMULADO","","${sumaBase.toFixed(2)}","${sumaDesc.toFixed(2)}","${sumaTotal.toFixed(2)}"\n`;
-        
-        // Configura la descarga para que se abra directo en Excel
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename=Reporte_Cupones_GNC.csv`);
-        
-        // El '\uFEFF' es un código invisible para que Excel reconozca los acentos de una
-        res.send(Buffer.from('\uFEFF' + reporteFinal, 'utf-8'));
+
+        res.json({
+            patente: patenteBuscada,
+            totalAhorrado: totalAhorrado.toFixed(2),
+            historial: historial.reverse() // Mostrar lo más nuevo primero
+        });
     } catch (error) {
-        console.error("Error al generar el reporte:", error);
-        res.status(500).send("Error al generar el archivo de descarga.");
+        res.status(500).json({ error: "Error en la consulta" });
     }
 });
 
-// Arranca el sistema en el puerto 3000
-const PUERTO = 3000;
-app.listen(PUERTO, () => {
-    console.log("=====================================================");
-    console.log(`⛽ SERVIDOR GNC ACTIVADO EN EL PUERTO ${PUERTO}`);
-    console.log("👉 Guardando cupones en tiempo real.");
-    console.log(`👉 Descargá el Excel en: http://localhost:${PUERTO}/descargar-reporte`);
-    console.log("=====================================================");
+app.listen(3000, () => {
+    console.log("⛽ Servidor cliente-servidor activo en el puerto 3000");
 });
