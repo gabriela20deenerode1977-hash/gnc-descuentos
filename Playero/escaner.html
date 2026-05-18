@@ -47,13 +47,16 @@
                 </tr>
             </thead>
             <tbody>
-                </tbody>
+            </tbody>
         </table>
 
         <button class="btn-descarga" onclick="descargarYFecharTurno()">📥 DESCARGAR EXCEL Y CERRAR TURNO</button>
     </div>
 
     <script>
+        // IP de la computadora de la caja configurada correctamente
+        const IP_DE_LA_COMPU = "192.168.1.96"; 
+
         let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
 
         actualizarTabla();
@@ -83,21 +86,21 @@
             }
 
             const fecha = new Date().toLocaleString();
-            
-            // CALCULOS CON EL DESCUENTO
             const descuentoPesos = (monto * 0.05).toFixed(2);
             const total = (monto * 0.95).toFixed(2);
 
-            // Guardamos en la memoria local incluyendo el valor del descuento en pesos
+            // Guardado local en el celular del playero
             cargasDelTurno.push({ fecha, patente, monto: monto.toFixed(2), descuento: descuentoPesos, total });
             localStorage.setItem('cargas_turno', JSON.stringify(cargasDelTurno));
 
-            // Copia de seguridad al servidor
-            fetch('/guardar-carga', {
+            // ENVÍO AL EXCEL CENTRAL DE LA COMPUTADORA DE LA CAJA
+            fetch(`http://${IP_DE_LA_COMPU}:3000/guardar-carga`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ patente, monto, total })
-            }).catch(err => console.error("Error de respaldo:", err));
+            })
+            .then(res => console.log("Copia guardada en el Excel unificado de la caja."))
+            .catch(err => console.error("La compu de la caja está apagada o el servidor no corre:", err));
 
             alert("✅ Carga registrada.");
             location.reload();
@@ -132,28 +135,22 @@
                 nombreArchivo = nombreSugerido;
             }
 
-            // Variables para calcular las sumas finales del Excel
             let sumaMontoBase = 0;
             let sumaDescuentos = 0;
             let sumaTotales = 0;
 
-            // Encabezados del Excel con la nueva columna
             let contenidoCsv = "sep=,\nFecha y Hora,Patente,Monto Base,Descuento ($),Total Cobrado\n";
             
             cargasDelTurno.forEach(c => {
                 contenidoCsv += `"${c.fecha}","${c.patente}","${c.monto}","${c.descuento}","${c.total}"\n`;
-                
-                // Vamos sumando los números uno a uno
                 sumaMontoBase += parseFloat(c.monto);
                 sumaDescuentos += parseFloat(c.descuento);
                 sumaTotales += parseFloat(c.total);
             });
 
-            // AGREGAMOS LAS FILAS DE SUMA TOTAL AL FINAL DEL ARCHIVO
-            contenidoCsv += `\n`; // Línea en blanco separadora
+            contenidoCsv += `\n`;
             contenidoCsv += `"TOTALES DEL TURNO","","${sumaMontoBase.toFixed(2)}","${sumaDescuentos.toFixed(2)}","${sumaTotales.toFixed(2)}"\n`;
 
-            // Crear el archivo de descarga
             let blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), contenidoCsv], { type: 'text/csv;charset=utf-8;' });
             let link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
@@ -163,7 +160,6 @@
             link.click();
             document.body.removeChild(link);
 
-            // Cierre de turno y limpieza automática
             localStorage.removeItem('cargas_turno');
             cargasDelTurno = [];
             

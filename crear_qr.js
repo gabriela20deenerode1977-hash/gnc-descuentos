@@ -2,8 +2,8 @@ const QRCode = require('qrcode');
 const fs = require('fs');
 
 // ==== 1. PON AQUÍ LOS DATOS DEL CLIENTE NUEVO ====
-const patenteCliente = 'AF123JK'; // Cambia esto por la patente real
-const nombreCliente = 'Juan Perez'; // Cambia esto por el nombre del cliente
+const patenteCliente = 'KRM831'; // Cambia esto por la patente real
+const nombreCliente = 'GABY'; // Cambia esto por el nombre del cliente
 // ================================================
 
 async function generarElQR() {
