@@ -12,7 +12,7 @@
         input { width: 80%; padding: 15px; font-size: 20px; margin: 10px 0; border-radius: 5px; border: none; text-align: center; }
         button { background: #00ff00; color: black; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 5px; cursor: pointer; margin: 10px; }
         
-        /* Contenedor estético de filtros de fecha */
+        /* Filtros de fecha */
         .filtro-fechas {
             background: #1e1e1e;
             border: 1px solid #333;
@@ -76,95 +76,3 @@
                     <th>Descuento ($)</th>
                     <th>Total Cobrado</th>
                 </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
-
-        <div class="filtro-fechas">
-            <h4 style="margin: 0 0 5px 0; color: #00ff00;">📅 Seleccionar Período a Descargar</h4>
-            <div>
-                <label for="fechaDesde">Desde:</label>
-                <input type="date" id="fechaDesde">
-            </div>
-            <div>
-                <label for="fechaHasta">Hasta:</label>
-                <input type="date" id="fechaHasta">
-            </div>
-        </div>
-
-        <button class="btn-descarga" onclick="descargarYFecharTurno()">📥 DESCARGAR EXCEL POR PERÍODO</button>
-    </div>
-
-    <script>
-        // Volvemos a tu IP original de la red local
-        const IP_DE_LA_COMPU = "192.168.1.96"; 
-
-        let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
-
-        actualizarTabla();
-
-        const hoyStr = new Date().toISOString().slice(0, 10);
-        document.getElementById('fechaDesde').value = hoyStr;
-        document.getElementById('fechaHasta').value = hoyStr;
-
-        function onScanSuccess(decodedText) {
-            document.getElementById('patente-detectada').innerText = "Vehículo: " + decodedText;
-            document.getElementById('resultado').style.display = 'block';
-            document.getElementById('reader').style.display = 'none';
-            if (window.html5QrcodeScanner) {
-                html5QrcodeScanner.clear();
-            }
-        }
-
-        function calcular() {
-            let monto = document.getElementById('monto').value;
-            let total = monto * 0.95;
-            document.getElementById('total').innerText = total.toFixed(2);
-        }
-
-        function finalizar() {
-            const patente = document.getElementById('patente-detectada').innerText.replace("Vehículo: ", "");
-            const monto = parseFloat(document.getElementById('monto').value);
-
-            if (!monto || monto <= 0) {
-                alert("Por favor, ingresa un monto válido.");
-                return;
-            }
-
-            const fecha = new Date().toLocaleString();
-            const descuentoPesos = (monto * 0.05).toFixed(2);
-            const total = (monto * 0.95).toFixed(2);
-
-            cargasDelTurno.push({ fecha, patente, monto: monto.toFixed(2), descuento: descuentoPesos, total });
-            localStorage.setItem('cargas_turno', JSON.stringify(cargasDelTurno));
-
-            fetch(`http://${IP_DE_LA_COMPU}:3000/guardar-carga`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ patente, monto, total })
-            })
-            .then(res => console.log("Copia guardada en el Excel unificado de la caja."))
-            .catch(err => console.error("La compu de la caja está apagada o el servidor no corre:", err));
-
-            alert("✅ Carga registrada.");
-            location.reload();
-        }
-
-        function actualizarTabla() {
-            const tbody = document.querySelector('#tabla-cargas tbody');
-            tbody.innerHTML = '';
-            cargasDelTurno.forEach(carga => {
-                const fila = `<tr>
-                    <td>${carga.fecha}</td>
-                    <td>${carga.patente}</td>
-                    <td>$${carga.monto}</td>
-                    <td>$${carga.descuento}</td>
-                    <td>$${carga.total}</td>
-                </tr>`;
-                tbody.innerHTML += fila;
-            });
-        }
-
-        function descargarYFecharTurno() {
-            
