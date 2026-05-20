@@ -60,7 +60,7 @@
         <p>Monto cargado ($):</p>
         <input type="number" id="monto" placeholder="Ej: 4000" oninput="calcular()">
         <div class="monto-final">Total a Cobrar: $<span id="total">0</span></div>
-        <p style="color: #aaa;">Descuento 5% applied</p>
+        <p style="color: #aaa;">Descuento 5% aplicado</p>
         <br>
         <button onclick="finalizar()">Confirmar Carga</button>
     </div>
@@ -97,14 +97,14 @@
     </div>
 
     <script>
-        // Enlace seguro y permanente de Localtunnel que salta el bloqueo de los celulares
-        const URL_SERVIDOR = "https://gnc-validador-caja.localtunnel.me"; 
+        // Actualizado con la URL exacta que te otorgó tu consola de Localtunnel
+        const URL_SERVIDOR = "https://tender-turkey-76.loca.lt"; 
 
         let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
 
         actualizarTabla();
 
-        // Autocompletar los campos con la fecha de hoy
+        // Autocompletar con la fecha de hoy
         const hoyStr = new Date().toISOString().slice(0, 10);
         document.getElementById('fechaDesde').value = hoyStr;
         document.getElementById('fechaHasta').value = hoyStr;
@@ -137,18 +137,17 @@
             const descuentoPesos = (monto * 0.05).toFixed(2);
             const total = (monto * 0.95).toFixed(2);
 
-            // Guardado local en el celular del playero
             cargasDelTurno.push({ fecha, patente, monto: monto.toFixed(2), descuento: descuentoPesos, total });
             localStorage.setItem('cargas_turno', JSON.stringify(cargasDelTurno));
 
-            // ENVÍO AL EXCEL CENTRAL (A TRAVÉS DE LOCALTUNNEL)
+            // ENVÍO MEDIANTE EL TÚNEL ACTIVO
             fetch(`${URL_SERVIDOR}/guardar-carga`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ patente, monto, total })
             })
             .then(res => console.log("Copia guardada en el Excel unificado de la caja."))
-            .catch(err => console.error("Error al enviar los datos a la caja principal:", err));
+            .catch(err => console.error("Error al enviar a la caja principal:", err));
 
             alert("✅ Carga registrada.");
             location.reload();
@@ -196,10 +195,8 @@
                     return;
                 }
 
-                // Descarga directa del archivo nativo Excel (.xlsx) generado por la caja
                 window.location.href = urlDescarga;
 
-                // Limpieza local de la pantalla del playero
                 localStorage.removeItem('cargas_turno');
                 cargasDelTurno = [];
                 
@@ -207,7 +204,7 @@
                 setTimeout(() => location.reload(), 1000);
             })
             .catch(err => {
-                alert("❌ No se pudo conectar con el servidor central de la caja. Verificá que la PC principal esté encendida y corriendo Localtunnel.");
+                alert("❌ No se pudo conectar con el servidor central de la caja. Verificá que la PC principal tenga Localtunnel corriendo.");
                 console.error(err);
             });
         }
