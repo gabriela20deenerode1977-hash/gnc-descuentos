@@ -97,14 +97,13 @@
     </div>
 
     <script>
-        // Actualizado con la URL exacta que te otorgó tu consola de Localtunnel
-        const URL_SERVIDOR = "https://tender-turkey-76.loca.lt"; 
+        // Volvemos a tu IP original de la red local
+        const IP_DE_LA_COMPU = "192.168.1.96"; 
 
         let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
 
         actualizarTabla();
 
-        // Autocompletar con la fecha de hoy
         const hoyStr = new Date().toISOString().slice(0, 10);
         document.getElementById('fechaDesde').value = hoyStr;
         document.getElementById('fechaHasta').value = hoyStr;
@@ -140,14 +139,13 @@
             cargasDelTurno.push({ fecha, patente, monto: monto.toFixed(2), descuento: descuentoPesos, total });
             localStorage.setItem('cargas_turno', JSON.stringify(cargasDelTurno));
 
-            // ENVÍO MEDIANTE EL TÚNEL ACTIVO
-            fetch(`${URL_SERVIDOR}/guardar-carga`, {
+            fetch(`http://${IP_DE_LA_COMPU}:3000/guardar-carga`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ patente, monto, total })
             })
             .then(res => console.log("Copia guardada en el Excel unificado de la caja."))
-            .catch(err => console.error("Error al enviar a la caja principal:", err));
+            .catch(err => console.error("La compu de la caja está apagada o el servidor no corre:", err));
 
             alert("✅ Carga registrada.");
             location.reload();
@@ -169,48 +167,4 @@
         }
 
         function descargarYFecharTurno() {
-            const desde = document.getElementById('fechaDesde').value;
-            const hasta = document.getElementById('fechaHasta').value;
-
-            if (!desde || !hasta) {
-                alert("Por favor, seleccioná ambas fechas (Desde / Hasta) para procesar el reporte.");
-                return;
-            }
-
-            if (new Date(desde) > new Date(hasta)) {
-                alert("La fecha de inicio 'Desde' no puede ser mayor que la fecha final 'Hasta'.");
-                return;
-            }
-
-            const urlDescarga = `${URL_SERVIDOR}/descargar-reporte?desde=${desde}&hasta=${hasta}`;
-
-            fetch(urlDescarga)
-            .then(async response => {
-                if (response.status === 444) {
-                    alert("⚠️ No se encontraron registros de cargas para el rango de fechas seleccionado.");
-                    return;
-                }
-                if (!response.ok) {
-                    alert("Ocurrió un error en el servidor central al procesar el Excel.");
-                    return;
-                }
-
-                window.location.href = urlDescarga;
-
-                localStorage.removeItem('cargas_turno');
-                cargasDelTurno = [];
-                
-                alert("🔒 Turno procesado y descargado con éxito. Los datos de la pantalla local se limpiaron para el siguiente turno.");
-                setTimeout(() => location.reload(), 1000);
-            })
-            .catch(err => {
-                alert("❌ No se pudo conectar con el servidor central de la caja. Verificá que la PC principal tenga Localtunnel corriendo.");
-                console.error(err);
-            });
-        }
-
-        let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-        html5QrcodeScanner.render(onScanSuccess);
-    </script>
-</body>
-</html>
+            
