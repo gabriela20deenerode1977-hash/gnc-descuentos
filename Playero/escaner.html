@@ -3,57 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Validador GNC - Playero</title>
+    <title>Validador GNC playero</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; margin: 0; }
-        #reader { width: 100%; max-width: 500px; margin: auto; border: 2px solid #00ff00; }
+        
+        /* Contenedor del escáner idéntico a tu diseño */
+        #reader { width: 100%; max-width: 500px; margin: auto; border: 2px solid red; border-radius: 10px; overflow: hidden; position: relative; }
+        
+        /* Cartel de guía sobre la cámara */
+        .cartel-camara { background: rgba(255, 0, 0, 0.2); border: 1px solid red; color: #ff9999; padding: 10px; font-size: 14px; font-weight: bold; margin-bottom: 10px; border-radius: 5px; }
+
         .resultado { background: #222; padding: 20px; border-radius: 10px; margin-top: 20px; display: none; }
         input { width: 80%; padding: 15px; font-size: 20px; margin: 10px 0; border-radius: 5px; border: none; text-align: center; }
         button { background: #00ff00; color: black; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 5px; cursor: pointer; margin: 10px; }
         
-        /* Filtros de fecha */
-        .filtro-fechas {
-            background: #1e1e1e;
-            border: 1px solid #333;
-            border-radius: 10px;
-            max-width: 400px;
-            margin: 30px auto 10px auto;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: center;
-        }
-        .filtro-fechas div {
-            display: flex;
-            justify-content: space-between;
-            width: 90%;
-            align-items: center;
-        }
-        .filtro-fechas label { font-weight: bold; color: #aaa; font-size: 16px; }
-        .filtro-fechas input[type="date"] { 
-            width: 60%; 
-            padding: 8px; 
-            font-size: 16px; 
-            background: #2d2d2d; 
-            color: #00ff00; 
-            border: 1px solid #444; 
-            margin: 0;
-        }
-
-        .btn-descarga { background: #ffc107; color: black; width: 100%; max-width: 400px; font-size: 20px; padding: 20px; margin-top: 10px; border-radius: 10px; font-weight: bold; border: none; cursor: pointer; }
         .monto-final { color: #00ff00; font-size: 30px; font-weight: bold; }
-        .tabla-contenedor { max-width: 700px; margin: 30px auto; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; background: #1e1e1e; }
-        th, td { border: 1px solid #333; padding: 12px; text-align: center; }
-        th { background: #2d2d2d; color: #00ff00; }
+        
+        /* Historial y tabla idénticos a tu captura */
+        .tabla-contenedor { max-width: 500px; margin: 20px auto; text-align: left; }
+        .titulo-historial { font-size: 22px; display: flex; align-items: center; gap: 8px; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; background: #ffffff; color: #000000; border-radius: 5px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; font-size: 15px; }
+        th { background: #f4f4f4; color: #333; font-weight: bold; }
+
+        /* Filtros y botón de descarga abajo */
+        .filtro-fechas { background: #1e1e1e; border: 1px solid #333; border-radius: 10px; max-width: 500px; margin: 30px auto 10px auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+        .filtro-fechas div { display: flex; justify-content: space-between; width: 90%; align-items: center; }
+        .filtro-fechas label { font-weight: bold; color: #aaa; font-size: 16px; }
+        .filtro-fechas input[type="date"] { width: 60%; padding: 8px; font-size: 16px; background: #2d2d2d; color: #00ff00; border: 1px solid #444; margin: 0; }
+        .btn-descarga { background: #ffc107; color: black; width: 100%; max-width: 500px; font-size: 18px; padding: 15px; margin-top: 10px; border-radius: 10px; font-weight: bold; border: none; cursor: pointer; display: block; margin-left: auto; margin-right: auto; }
     </style>
 </head>
 <body>
     <h2>⛽ Validador GNC</h2>
     
-    <div id="reader"></div>
+    <div class="tabla-contenedor" style="max-width: 500px; margin: auto;">
+        <div class="cartel-camara">Cámara activada. Si la patente no se detecta, acércala al recuadro.</div>
+        <div id="reader"></div>
+    </div>
 
     <div id="resultado" class="resultado">
         <h3 id="patente-detectada"></h3>
@@ -66,13 +54,54 @@
     </div>
 
     <div class="tabla-contenedor">
-        <h3>📋 Cargas del Turno Actual</h3>
+        <div class="titulo-historial">📋 Historial del Turno Actual</div>
         <table id="tabla-cargas">
             <thead>
                 <tr>
-                    <th>Fecha/Hora</th>
-                    <th>Patente</th>
-                    <th>Monto Base</th>
-                    <th>Descuento ($)</th>
-                    <th>Total Cobrado</th>
+                    <th>Turno</th>
+                    <th>Turno Datoo</th>
                 </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+
+        <div class="filtro-fechas">
+            <h4 style="margin: 0 0 5px 0; color: #00ff00;">📅 Seleccionar Período a Descargar</h4>
+            <div>
+                <label for="fechaDesde">Desde:</label>
+                <input type="date" id="fechaDesde">
+            </div>
+            <div>
+                <label for="fechaHasta">Hasta:</label>
+                <input type="date" id="fechaHasta">
+            </div>
+        </div>
+        <button class="btn-descarga" onclick="descargarYFecharTurno()">📥 DESCARGAR EXCEL POR PERÍODO</button>
+    </div>
+
+    <script>
+        const IP_DE_LA_COMPU = "192.168.1.96"; 
+
+        let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
+
+        actualizarTabla();
+
+        const hoyStr = new Date().toISOString().slice(0, 10);
+        document.getElementById('fechaDesde').value = hoyStr;
+        document.getElementById('fechaHasta').value = hoyStr;
+
+        function onScanSuccess(decodedText) {
+            document.getElementById('patente-detectada').innerText = "Vehículo: " + decodedText;
+            document.getElementById('resultado').style.display = 'block';
+            document.getElementById('reader').style.display = 'none';
+            document.querySelector('.cartel-camara').style.display = 'none';
+            if (window.html5QrcodeScanner) {
+                html5QrcodeScanner.clear();
+            }
+        }
+
+        function calcular() {
+            let monto = document.getElementById('monto').value;
+            let total = monto * 0.95;
+            document.getElementById('total').innerText = total
