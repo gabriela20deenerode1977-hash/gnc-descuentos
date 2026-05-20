@@ -60,7 +60,7 @@
         <p>Monto cargado ($):</p>
         <input type="number" id="monto" placeholder="Ej: 4000" oninput="calcular()">
         <div class="monto-final">Total a Cobrar: $<span id="total">0</span></div>
-        <p style="color: #aaa;">Descuento 5% aplicado</p>
+        <p style="color: #aaa;">Descuento 5% applied</p>
         <br>
         <button onclick="finalizar()">Confirmar Carga</button>
     </div>
@@ -97,14 +97,14 @@
     </div>
 
     <script>
-        // IP de la computadora de la caja configurada correctamente
-        const IP_DE_LA_COMPU = "192.168.1.96"; 
+        // Enlace seguro y permanente de Localtunnel que salta el bloqueo de los celulares
+        const URL_SERVIDOR = "https://gnc-validador-caja.localtunnel.me"; 
 
         let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
 
         actualizarTabla();
 
-        // Autocompletar los campos de fecha con el día de hoy por comodidad para el playero
+        // Autocompletar los campos con la fecha de hoy
         const hoyStr = new Date().toISOString().slice(0, 10);
         document.getElementById('fechaDesde').value = hoyStr;
         document.getElementById('fechaHasta').value = hoyStr;
@@ -141,14 +141,14 @@
             cargasDelTurno.push({ fecha, patente, monto: monto.toFixed(2), descuento: descuentoPesos, total });
             localStorage.setItem('cargas_turno', JSON.stringify(cargasDelTurno));
 
-            // ENVÍO AL EXCEL CENTRAL DE LA COMPUTADORA DE LA CAJA
-            fetch(`http://${IP_DE_LA_COMPU}:3000/guardar-carga`, {
+            // ENVÍO AL EXCEL CENTRAL (A TRAVÉS DE LOCALTUNNEL)
+            fetch(`${URL_SERVIDOR}/guardar-carga`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ patente, monto, total })
             })
             .then(res => console.log("Copia guardada en el Excel unificado de la caja."))
-            .catch(err => console.error("La compu de la caja está apagada o el servidor no corre:", err));
+            .catch(err => console.error("Error al enviar los datos a la caja principal:", err));
 
             alert("✅ Carga registrada.");
             location.reload();
@@ -169,7 +169,6 @@
             });
         }
 
-        // FUNCIÓN MODIFICADA: Ahora consulta al Servidor Central pasando las fechas indicadas
         function descargarYFecharTurno() {
             const desde = document.getElementById('fechaDesde').value;
             const hasta = document.getElementById('fechaHasta').value;
@@ -179,16 +178,13 @@
                 return;
             }
 
-            // Validar que la fecha "desde" no sea mayor que "hasta"
             if (new Date(desde) > new Date(hasta)) {
                 alert("La fecha de inicio 'Desde' no puede ser mayor que la fecha final 'Hasta'.");
                 return;
             }
 
-            // Armamos la URL del backend central con los parámetros requeridos
-            const urlDescarga = `http://${IP_DE_LA_COMPU}:3000/descargar-reporte?desde=${desde}&hasta=${hasta}`;
+            const urlDescarga = `${URL_SERVIDOR}/descargar-reporte?desde=${desde}&hasta=${hasta}`;
 
-            // Hacemos una verificación rápida mediante fetch para alertar si no hay datos antes de forzar la descarga
             fetch(urlDescarga)
             .then(async response => {
                 if (response.status === 444) {
@@ -200,10 +196,10 @@
                     return;
                 }
 
-                // Si todo está OK, forzamos la descarga del archivo .xlsx nativo de manera directa
+                // Descarga directa del archivo nativo Excel (.xlsx) generado por la caja
                 window.location.href = urlDescarga;
 
-                // Una vez descargado con éxito el reporte, limpiamos la pantalla local del playero para el próximo turno
+                // Limpieza local de la pantalla del playero
                 localStorage.removeItem('cargas_turno');
                 cargasDelTurno = [];
                 
@@ -211,7 +207,7 @@
                 setTimeout(() => location.reload(), 1000);
             })
             .catch(err => {
-                alert("❌ No se pudo conectar con el servidor central de la caja. Verificá que la PC principal esté encendida.");
+                alert("❌ No se pudo conectar con el servidor central de la caja. Verificá que la PC principal esté encendida y corriendo Localtunnel.");
                 console.error(err);
             });
         }
