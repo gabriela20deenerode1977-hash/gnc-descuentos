@@ -11,7 +11,38 @@
         .resultado { background: #222; padding: 20px; border-radius: 10px; margin-top: 20px; display: none; }
         input { width: 80%; padding: 15px; font-size: 20px; margin: 10px 0; border-radius: 5px; border: none; text-align: center; }
         button { background: #00ff00; color: black; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 5px; cursor: pointer; margin: 10px; }
-        .btn-descarga { background: #ffc107; color: black; width: 100%; max-width: 400px; font-size: 20px; padding: 20px; margin-top: 30px; border-radius: 10px; font-weight: bold; }
+        
+        /* Contenedor estético de filtros de fecha */
+        .filtro-fechas {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 10px;
+            max-width: 400px;
+            margin: 30px auto 10px auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+        .filtro-fechas div {
+            display: flex;
+            justify-content: space-between;
+            width: 90%;
+            align-items: center;
+        }
+        .filtro-fechas label { font-weight: bold; color: #aaa; font-size: 16px; }
+        .filtro-fechas input[type="date"] { 
+            width: 60%; 
+            padding: 8px; 
+            font-size: 16px; 
+            background: #2d2d2d; 
+            color: #00ff00; 
+            border: 1px solid #444; 
+            margin: 0;
+        }
+
+        .btn-descarga { background: #ffc107; color: black; width: 100%; max-width: 400px; font-size: 20px; padding: 20px; margin-top: 10px; border-radius: 10px; font-weight: bold; border: none; cursor: pointer; }
         .monto-final { color: #00ff00; font-size: 30px; font-weight: bold; }
         .tabla-contenedor { max-width: 700px; margin: 30px auto; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; background: #1e1e1e; }
@@ -50,7 +81,19 @@
             </tbody>
         </table>
 
-        <button class="btn-descarga" onclick="descargarYFecharTurno()">📥 DESCARGAR EXCEL Y CERRAR TURNO</button>
+        <div class="filtro-fechas">
+            <h4 style="margin: 0 0 5px 0; color: #00ff00;">📅 Seleccionar Período a Descargar</h4>
+            <div>
+                <label for="fechaDesde">Desde:</label>
+                <input type="date" id="fechaDesde">
+            </div>
+            <div>
+                <label for="fechaHasta">Hasta:</label>
+                <input type="date" id="fechaHasta">
+            </div>
+        </div>
+
+        <button class="btn-descarga" onclick="descargarYFecharTurno()">📥 DESCARGAR EXCEL POR PERÍODO</button>
     </div>
 
     <script>
@@ -60,6 +103,11 @@
         let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
 
         actualizarTabla();
+
+        // Autocompletar los campos de fecha con el día de hoy por comodidad para el playero
+        const hoyStr = new Date().toISOString().slice(0, 10);
+        document.getElementById('fechaDesde').value = hoyStr;
+        document.getElementById('fechaHasta').value = hoyStr;
 
         function onScanSuccess(decodedText) {
             document.getElementById('patente-detectada').innerText = "Vehículo: " + decodedText;
@@ -121,50 +169,51 @@
             });
         }
 
+        // FUNCIÓN MODIFICADA: Ahora consulta al Servidor Central pasando las fechas indicadas
         function descargarYFecharTurno() {
-            if (cargasDelTurno.length === 0) {
-                alert("No hay cargas registradas en este turno.");
+            const desde = document.getElementById('fechaDesde').value;
+            const hasta = document.getElementById('fechaHasta').value;
+
+            if (!desde || !hasta) {
+                alert("Por favor, seleccioná ambas fechas (Desde / Hasta) para procesar el reporte.");
                 return;
             }
 
-            let nombreSugerido = "Turno_GNC_" + new Date().toISOString().slice(0,10);
-            let nombreArchivo = prompt("Escribe el nombre para el archivo Excel:", nombreSugerido);
-            
-            if (nombreArchivo === null) return; 
-            if (nombreArchivo.trim() === "") {
-                nombreArchivo = nombreSugerido;
+            // Validar que la fecha "desde" no sea mayor que "hasta"
+            if (new Date(desde) > new Date(hasta)) {
+                alert("La fecha de inicio 'Desde' no puede ser mayor que la fecha final 'Hasta'.");
+                return;
             }
 
-            let sumaMontoBase = 0;
-            let sumaDescuentos = 0;
-            let sumaTotales = 0;
+            // Armamos la URL del backend central con los parámetros requeridos
+            const urlDescarga = `http://${IP_DE_LA_COMPU}:3000/descargar-reporte?desde=${desde}&hasta=${hasta}`;
 
-            let contenidoCsv = "sep=,\nFecha y Hora,Patente,Monto Base,Descuento ($),Total Cobrado\n";
-            
-            cargasDelTurno.forEach(c => {
-                contenidoCsv += `"${c.fecha}","${c.patente}","${c.monto}","${c.descuento}","${c.total}"\n`;
-                sumaMontoBase += parseFloat(c.monto);
-                sumaDescuentos += parseFloat(c.descuento);
-                sumaTotales += parseFloat(c.total);
+            // Hacemos una verificación rápida mediante fetch para alertar si no hay datos antes de forzar la descarga
+            fetch(urlDescarga)
+            .then(async response => {
+                if (response.status === 444) {
+                    alert("⚠️ No se encontraron registros de cargas para el rango de fechas seleccionado.");
+                    return;
+                }
+                if (!response.ok) {
+                    alert("Ocurrió un error en el servidor central al procesar el Excel.");
+                    return;
+                }
+
+                // Si todo está OK, forzamos la descarga del archivo .xlsx nativo de manera directa
+                window.location.href = urlDescarga;
+
+                // Una vez descargado con éxito el reporte, limpiamos la pantalla local del playero para el próximo turno
+                localStorage.removeItem('cargas_turno');
+                cargasDelTurno = [];
+                
+                alert("🔒 Turno procesado y descargado con éxito. Los datos de la pantalla local se limpiaron para el siguiente turno.");
+                setTimeout(() => location.reload(), 1000);
+            })
+            .catch(err => {
+                alert("❌ No se pudo conectar con el servidor central de la caja. Verificá que la PC principal esté encendida.");
+                console.error(err);
             });
-
-            contenidoCsv += `\n`;
-            contenidoCsv += `"TOTALES DEL TURNO","","${sumaMontoBase.toFixed(2)}","${sumaDescuentos.toFixed(2)}","${sumaTotales.toFixed(2)}"\n`;
-
-            let blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), contenidoCsv], { type: 'text/csv;charset=utf-8;' });
-            let link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", `${nombreArchivo.trim()}.csv`);
-            document.body.appendChild(link);
-            
-            link.click();
-            document.body.removeChild(link);
-
-            localStorage.removeItem('cargas_turno');
-            cargasDelTurno = [];
-            
-            alert("🔒 Turno cerrado con éxito. Los datos se han limpiado para el siguiente turno.");
-            location.reload();
         }
 
         let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
