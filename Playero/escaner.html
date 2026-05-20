@@ -11,7 +11,7 @@
         .resultado { background: #222; padding: 20px; border-radius: 10px; margin-top: 20px; display: none; }
         input { width: 80%; padding: 15px; font-size: 20px; margin: 10px 0; border-radius: 5px; border: none; text-align: center; }
         button { background: #00ff00; color: black; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 5px; cursor: pointer; margin: 10px; }
-        .btn-descarga { background: #ffc107; color: black; width: 100%; max-width: 400px; font-size: 20px; padding: 20px; margin-top: 30px; border-radius: 10px; font-weight: bold; }
+        .btn-descarga { background: #ffc107; color: black; width: 100%; max-width: 400px; font-size: 20px; padding: 20px; margin-top: 30px; border-radius: 10px; font-weight: bold; border: none; cursor: pointer; }
         .monto-final { color: #00ff00; font-size: 30px; font-weight: bold; }
         .tabla-contenedor { max-width: 700px; margin: 30px auto; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; background: #1e1e1e; }
@@ -54,7 +54,6 @@
     </div>
 
     <script>
-        // IP de la computadora de la caja configurada correctamente
         const IP_DE_LA_COMPU = "192.168.1.96"; 
 
         let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
@@ -89,18 +88,16 @@
             const descuentoPesos = (monto * 0.05).toFixed(2);
             const total = (monto * 0.95).toFixed(2);
 
-            // Guardado local en el celular del playero
             cargasDelTurno.push({ fecha, patente, monto: monto.toFixed(2), descuento: descuentoPesos, total });
             localStorage.setItem('cargas_turno', JSON.stringify(cargasDelTurno));
 
-            // ENVÍO AL EXCEL CENTRAL DE LA COMPUTADORA DE LA CAJA
             fetch(`http://${IP_DE_LA_COMPU}:3000/guardar-carga`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ patente, monto, total })
             })
-            .then(res => console.log("Copia guardada en el Excel unificado de la caja."))
-            .catch(err => console.error("La compu de la caja está apagada o el servidor no corre:", err));
+            .then(res => console.log("Copia guardada en la caja."))
+            .catch(err => console.error("Error al conectar con la caja:", err));
 
             alert("✅ Carga registrada.");
             location.reload();
