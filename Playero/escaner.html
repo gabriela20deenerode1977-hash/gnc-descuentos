@@ -56,8 +56,10 @@
     <script>
         const IP_DE_LA_COMPU = "192.168.1.96"; 
 
+        // Levantamos las cargas del almacenamiento local
         let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
 
+        // Dibujamos la tabla apenas abre la pagina
         actualizarTabla();
 
         function onScanSuccess(decodedText) {
@@ -88,16 +90,25 @@
             const descuentoPesos = (monto * 0.05).toFixed(2);
             const total = (monto * 0.95).toFixed(2);
 
-            cargasDelTurno.push({ fecha, patente, monto: monto.toFixed(2), descuento: descuentoPesos, total });
+            // CORRECCIÓN AQUÍ: Guardamos las propiedades con el nombre exacto que la tabla espera leer
+            cargasDelTurno.push({ 
+                fecha: fecha, 
+                patente: patente, 
+                monto: monto.toFixed(2), 
+                descuento: descuentoPesos, 
+                total: total 
+            });
+            
             localStorage.setItem('cargas_turno', JSON.stringify(cargasDelTurno));
 
+            // Envío en paralelo al sistema central de la caja
             fetch(`http://${IP_DE_LA_COMPU}:3000/guardar-carga`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ patente, monto, total })
             })
-            .then(res => console.log("Copia guardada en la caja."))
-            .catch(err => console.error("Error al conectar con la caja:", err));
+            .then(res => console.log("Guardado en la base central."))
+            .catch(err => console.error("Error de red con la PC central:", err));
 
             alert("✅ Carga registrada.");
             location.reload();
@@ -106,6 +117,8 @@
         function actualizarTabla() {
             const tbody = document.querySelector('#tabla-cargas tbody');
             tbody.innerHTML = '';
+            
+            // Recorremos el almacenamiento interno del telefono para mostrar el historial real
             cargasDelTurno.forEach(carga => {
                 const fila = `<tr>
                     <td>${carga.fecha}</td>
@@ -157,6 +170,7 @@
             link.click();
             document.body.removeChild(link);
 
+            // Se limpia el almacenamiento local para arrancar el turno nuevo de cero
             localStorage.removeItem('cargas_turno');
             cargasDelTurno = [];
             
