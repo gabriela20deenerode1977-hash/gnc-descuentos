@@ -20,6 +20,7 @@
   "homepage": "https://github.com/gabriela20deenerode1977-hash/gnc-descuentos#readme",
   "dependencies": {
     "cors": "^2.8.6",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "qrcode": "^1.5.4"
   }
