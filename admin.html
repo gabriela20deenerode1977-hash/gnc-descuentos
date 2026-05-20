@@ -11,15 +11,14 @@
         .campo { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; width: 100%; }
         label { font-weight: bold; color: #bbb; font-size: 16px; }
         input[type="date"] { width: 60%; padding: 10px; font-size: 16px; background: #222; color: #00ff00; border: 1px solid #444; border-radius: 6px; }
-        .btn-admin { background: #ffc107; color: black; width: 100%; font-size: 18px; padding: 15px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; margin-top: 15px; transition: 0.2s; }
-        .btn-admin:hover { background: #e0a800; }
+        .btn-admin { background: #ffc107; color: black; width: 100%; font-size: 18px; padding: 15px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; margin-top: 15px; }
     </style>
 </head>
 <body>
 
     <div class="panel">
         <h2>📊 Panel de Administración GNC</h2>
-        <p style="color: #aaa; font-size: 14px;">Seleccione el rango de fechas para extraer el reporte consolidado desde el servidor central.</p>
+        <p style="color: #aaa; font-size: 14px;">Extraer reportes consolidados por fechas desde el servidor de la caja.</p>
         <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
         
         <div class="campo">
@@ -36,10 +35,9 @@
     </div>
 
     <script>
-        // Al abrir el panel en la compu de la caja, le pega directamente al localhost
+        // Al usarlo en la misma PC de la caja, le pega derecho a tu servidor local
         const BACKEND_URL = "http://localhost:3000";
 
-        // Dejar seleccionada la fecha de hoy por defecto
         const hoy = new Date().toISOString().slice(0, 10);
         document.getElementById('fechaDesde').value = hoy;
         document.getElementById('fechaHasta').value = hoy;
@@ -49,34 +47,23 @@
             const hasta = document.getElementById('fechaHasta').value;
 
             if (!desde || !hasta) {
-                alert("Por favor, seleccione ambas fechas para procesar el reporte.");
+                alert("Por favor, seleccione ambas fechas.");
                 return;
             }
 
-            if (new Date(desde) > new Date(hasta)) {
-                alert("La fecha 'Desde' no puede ser mayor que la fecha 'Hasta'.");
-                return;
-            }
-
-            // Armamos la URL exacta con los parámetros de fecha que espera tu servidor de la caja
+            // Llamada directa a tu endpoint local con las fechas elegidas
             const urlCompleta = `${BACKEND_URL}/descargar-reporte?desde=${desde}&hasta=${hasta}`;
 
             fetch(urlCompleta)
             .then(async response => {
                 if (response.status === 444) {
-                    alert("⚠️ No se encontraron registros de cargas para el período seleccionado.");
+                    alert("⚠️ No se encontraron cargas para el período seleccionado.");
                     return;
                 }
-                if (!response.ok) {
-                    alert("Ocurrió un error en el servidor al generar el archivo Excel.");
-                    return;
-                }
-
-                // Si todo está ok, disparamos la descarga del Excel
                 window.location.href = urlCompleta;
             })
             .catch(err => {
-                alert("❌ No se pudo conectar con el servidor central de la caja. Asegurate de que 'node servidor.js' esté corriendo.");
+                alert("❌ No se pudo conectar con el servidor central. Asegurate de que el servidor local de Node esté corriendo en la terminal.");
                 console.error(err);
             });
         }
