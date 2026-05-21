@@ -1,71 +1,14 @@
 <!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Administrador - GNC</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; padding: 30px; background: #1a1a2e; color: white; margin: 0; }
-        .panel { background: #161623; border: 1px solid #333; border-radius: 12px; max-width: 450px; margin: 40px auto; padding: 25px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
-        h2 { color: #00ff00; margin-top: 0; }
-        .campo { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; width: 100%; }
-        label { font-weight: bold; color: #bbb; font-size: 16px; }
-        input[type="date"] { width: 60%; padding: 10px; font-size: 16px; background: #222; color: #00ff00; border: 1px solid #444; border-radius: 6px; }
-        .btn-admin { background: #ffc107; color: black; width: 100%; font-size: 18px; padding: 15px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; margin-top: 15px; }
-    </style>
-</head>
+<html>
 <body>
-
-    <div class="panel">
-        <h2>📊 Panel de Administración GNC</h2>
-        <p style="color: #aaa; font-size: 14px;">Extraer reportes consolidados por fechas desde el servidor de la caja.</p>
-        <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
-        
-        <div class="campo">
-            <label for="fechaDesde">Fecha Desde:</label>
-            <input type="date" id="fechaDesde">
-        </div>
-        
-        <div class="campo">
-            <label for="fechaHasta">Fecha Hasta:</label>
-            <input type="date" id="fechaHasta">
-        </div>
-
-        <button class="btn-admin" onclick="obtenerReporteFechas()">📥 DESCARGAR REPORTE POR FECHAS</button>
-    </div>
-
+    <h1>Reporte de Ventas</h1>
+    <button onclick="descargar()">Descargar Reporte</button>
+    <pre id="lista"></pre>
     <script>
-        // Al usarlo en la misma PC de la caja, le pega derecho a tu servidor local
-        const BACKEND_URL = "http://localhost:3000";
-
-        const hoy = new Date().toISOString().slice(0, 10);
-        document.getElementById('fechaDesde').value = hoy;
-        document.getElementById('fechaHasta').value = hoy;
-
-        function obtenerReporteFechas() {
-            const desde = document.getElementById('fechaDesde').value;
-            const hasta = document.getElementById('fechaHasta').value;
-
-            if (!desde || !hasta) {
-                alert("Por favor, seleccione ambas fechas.");
-                return;
-            }
-
-            // Llamada directa a tu endpoint local con las fechas elegidas
-            const urlCompleta = `${BACKEND_URL}/descargar-reporte?desde=${desde}&hasta=${hasta}`;
-
-            fetch(urlCompleta)
-            .then(async response => {
-                if (response.status === 444) {
-                    alert("⚠️ No se encontraron cargas para el período seleccionado.");
-                    return;
-                }
-                window.location.href = urlCompleta;
-            })
-            .catch(err => {
-                alert("❌ No se pudo conectar con el servidor central. Asegurate de que el servidor local de Node esté corriendo en la terminal.");
-                console.error(err);
-            });
+        async function descargar() {
+            const res = await fetch('http://192.168.1.39:3000/reporte');
+            const texto = await res.text();
+            document.getElementById('lista').innerText = texto;
         }
     </script>
 </body>
