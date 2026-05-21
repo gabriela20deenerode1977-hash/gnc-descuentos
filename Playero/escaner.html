@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Validador GNC - Playero</title>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js"></script>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; margin: 0; }
-        #reader { width: 100%; max-width: 500px; margin: auto; border: 2px solid #00ff00; }
+        #camara-contenedor { width: 100%; max-width: 500px; margin: auto; position: relative; border: 2px solid #00ff00; border-radius: 8px; overflow: hidden; background: #000; }
+        video { width: 100%; height: auto; display: block; }
+        .guia-patente { position: absolute; top: 35%; left: 10%; width: 80%; height: 30%; border: 2px dashed #00ff00; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); pointer-events: none; box-sizing: border-box; }
+        .texto-guia { position: absolute; bottom: 10px; left: 0; width: 100%; color: #00ff00; font-size: 14px; font-weight: bold; text-shadow: 1px 1px 2px black; }
         .resultado { background: #222; padding: 20px; border-radius: 10px; margin-top: 20px; display: none; }
         input { width: 80%; padding: 15px; font-size: 20px; margin: 10px 0; border-radius: 5px; border: none; text-align: center; }
         button { background: #00ff00; color: black; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 5px; cursor: pointer; margin: 10px; }
@@ -17,12 +20,18 @@
         table { width: 100%; border-collapse: collapse; background: #1e1e1e; }
         th, td { border: 1px solid #333; padding: 12px; text-align: center; }
         th { background: #2d2d2d; color: #00ff00; }
+        #status-lector { margin: 10px; color: #ffc107; font-weight: bold; }
     </style>
 </head>
 <body>
     <h2>⛽ Validador GNC</h2>
     
-    <div id="reader"></div>
+    <div id="camara-contenedor">
+        <video id="video" autoplay playsinline></video>
+        <div class="guia-patente"></div>
+        <div class="texto-guia">Encuadre la patente aquí</div>
+    </div>
+    <div id="status-lector">Iniciando cámara...</div>
 
     <div id="resultado" class="resultado">
         <h3 id="patente-detectada"></h3>
@@ -53,20 +62,88 @@
         <button class="btn-descarga" onclick="descargarYFecharTurno()">📥 DESCARGAR EXCEL Y CERRAR TURNO</button>
     </div>
 
-    <script>
-        // ¡ACTUALIZADO! IP real de la computadora de la caja hoy
-        const IP_DE_LA_COMPU = "192.168.1.39"; 
+    <canvas id="canvas" style="display:none;"></canvas>
 
+    <script>
+        const IP_DE_LA_COMPU = "192.168.1.39"; 
         let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
+        let videoStream = null;
+        let intervaloEscaneo = null;
 
         actualizarTabla();
+        iniciarCamara();
 
-        function onScanSuccess(decodedText) {
-            document.getElementById('patente-detectada').innerText = "Vehículo: " + decodedText;
-            document.getElementById('resultado').style.display = 'block';
-            document.getElementById('reader').style.display = 'none';
-            if (window.html5QrcodeScanner) {
-                html5QrcodeScanner.clear();
+        // 1. Encender la cámara trasera del celular
+        function iniciarCamara() {
+            const video = document.getElementById('video');
+            navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                audio: false 
+            })
+            .then(stream => {
+                videoStream = stream;
+                video.srcObject = stream;
+                document.getElementById('status-lector').innerText = "Buscando patente...";
+                // Empezamos a escanear de forma automática cada 2 segundos
+                intervaloEscaneo = setInterval(escanearTextoPatente, 2000);
+            })
+            .catch(err => {
+                console.error("Error de cámara:", err);
+                document.getElementById('status-lector').innerText = "❌ Error al acceder a la cámara.";
+            });
+        }
+
+        // 2. Capturar fotograma y procesarlo con OCR
+        function escanearTextoPatente() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                document.getElementById('status-lector').innerText = "Leyendo... mantenga firme.";
+
+                // Le pasamos la captura a Tesseract
+                Tesseract.recognize(canvas, 'eng', { logger: m => console.log(m.progress) })
+                .then(({ data: { text } }) => {
+                    const patenteLimpia = filtrarPatenteArgentina(text);
+                    
+                    if (patenteLimpia) {
+                        clearInterval(intervaloEscaneo); // Frenamos el bucle de lectura
+                        apagarCamara();
+                        
+                        document.getElementById('patente-detectada').innerText = "Vehículo: " + patenteLimpia;
+                        document.getElementById('resultado').style.display = 'block';
+                        document.getElementById('camara-contenedor').style.display = 'none';
+                        document.getElementById('status-lector').style.display = 'none';
+                    } else {
+                        document.getElementById('status-lector').innerText = "Buscando patente...";
+                    }
+                })
+                .catch(err => console.error("Error en OCR:", err));
+            }
+        }
+
+        // 3. Filtro inteligente para validar formatos de patente válidos (Viejas y Mercosur)
+        function filtrarPatenteArgentina(texto) {
+            // Limpiamos espacios, guiones y dejamos todo en mayúsculas
+            let limpio = texto.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+            // Buscamos patrones de patentes comunes adentro del texto reconocido:
+            // Formato Mercosur nuevo (AA123BB) o formato viejo (AAA123)
+            const regexMercosur = /[A-Z]{2}[0-9]{3}[A-Z]{2}/;
+            const regexVieja = /[A-Z]{3}[0-9]{3}/;
+
+            let coincidencia = limpio.match(regexMercosur) || limpio.match(regexVieja);
+            return coincidencia ? coincidencia[0] : null;
+        }
+
+        function apagarCamara() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
             }
         }
 
@@ -89,18 +166,16 @@
             const descuentoPesos = (monto * 0.05).toFixed(2);
             const total = (monto * 0.95).toFixed(2);
 
-            // Guardamos localmente en el celular del playero
             cargasDelTurno.push({ fecha, patente, monto: monto.toFixed(2), descuento: descuentoPesos, total });
             localStorage.setItem('cargas_turno', JSON.stringify(cargasDelTurno));
 
-            // Envío con la IP corregida y la fecha incluida para el servidor de la caja
             fetch(`http://${IP_DE_LA_COMPU}:3000/guardar-carga`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fecha, patente, monto, total })
             })
             .then(res => console.log("Copia guardada exitosamente en el servidor central."))
-            .catch(err => console.error("Error de red. No se pudo conectar con la IP de la caja:", err));
+            .catch(err => console.error("Error de red con la caja:", err));
 
             alert("✅ Carga registrada.");
             location.reload();
@@ -166,9 +241,6 @@
             alert("🔒 Turno cerrado con éxito. Los datos se han limpiado para el siguiente turno.");
             location.reload();
         }
-
-        let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
-        html5QrcodeScanner.render(onScanSuccess);
     </script>
 </body>
 </html>
