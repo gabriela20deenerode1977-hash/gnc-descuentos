@@ -9,11 +9,12 @@
         body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 10px; margin: 0; }
         #camara-contenedor { width: 100%; max-width: 500px; margin: auto; border: 3px solid #00ff00; border-radius: 10px; overflow: hidden; background: #000; }
         video { width: 100%; display: block; }
-        #status-lector { margin: 15px; color: #ffc107; font-weight: bold; font-size: 16px; }
+        #status-lector { margin: 15px; color: #ffc107; font-weight: bold; }
+        .input-manual { margin: 20px 0; }
+        .input-manual input { padding: 10px; font-size: 16px; border-radius: 5px; border: none; }
+        .input-manual button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
         .resultado { background: #222; padding: 20px; border-radius: 10px; margin-top: 10px; display: none; }
-        #datos-cliente { color: #ffc107; font-weight: bold; font-size: 1.1em; background: #000; padding: 10px; border-radius: 5px; margin: 10px 0; }
-        input { width: 90%; padding: 15px; font-size: 20px; margin: 10px 0; border-radius: 5px; border: none; text-align: center; }
-        button { background: #00ff00; color: black; padding: 15px 40px; font-size: 20px; font-weight: bold; border-radius: 5px; border: none; cursor: pointer; }
+        #datos-cliente { color: #ffc107; font-weight: bold; font-size: 1.2em; padding: 10px; background: #000; margin: 10px 0; }
     </style>
 </head>
 
@@ -23,70 +24,68 @@
     <div id="camara-contenedor">
         <video id="video" autoplay playsinline></video>
     </div>
+    
     <div id="status-lector">Cargando lector...</div>
+
+    <div class="input-manual">
+        <input type="text" id="patente-manual" placeholder="Tipear patente" style="text-transform: uppercase;">
+        <button onclick="buscarManual()">Buscar</button>
+    </div>
 
     <div id="resultado" class="resultado">
         <h3 id="patente-detectada" style="color: #fff;"></h3>
         <div id="datos-cliente"></div>
-        <p>Monto cargado ($):</p>
-        <input type="number" id="monto" placeholder="Ej: 5000">
+        <input type="number" id="monto" placeholder="Monto ($)" style="width: 80%; padding: 10px; margin: 10px 0;">
         <br>
-        <button onclick="finalizar()">CONFIRMAR CARGA</button>
+        <button onclick="finalizar()" style="background: #00ff00; padding: 15px 30px; font-weight: bold; border: none; border-radius: 5px;">CONFIRMAR CARGA</button>
     </div>
 
     <script>
-        const IP_DE_LA_COMPU = "192.168.1.39"; // Asegurate que esta sea la IP de tu PC
+        const IP_DE_LA_COMPU = "192.168.1.39"; 
         const video = document.getElementById('video');
         const status = document.getElementById('status-lector');
 
-        // Iniciar cámara
         window.addEventListener('load', async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 video.srcObject = stream;
-                status.innerText = "✅ Cámara lista. Apuntá a la patente.";
+                status.innerText = "✅ Cámara lista.";
                 iniciarEscaneo();
             } catch (err) {
-                status.innerText = "❌ Error de cámara: " + err.message;
+                status.innerText = "❌ Cámara no disponible.";
             }
         });
+
+        function buscarManual() {
+            const p = document.getElementById('patente-manual').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (p.length >= 6) verificarPatente(p);
+            else alert("Ingresá una patente válida.");
+        }
 
         function iniciarEscaneo() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-
             setInterval(async () => {
                 if (document.getElementById('resultado').style.display === 'block') return;
-
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
                 try {
                     const { data: { text } } = await Tesseract.recognize(canvas, 'eng');
                     const patente = (text.match(/[A-Z]{2,3}[0-9]{3}[A-Z]{0,2}/i) || [])[0];
-                    
-                    if (patente) {
-                        verificarPatente(patente.toUpperCase().replace(/[^A-Z0-9]/g, ''));
-                    }
-                } catch (e) { /* Escaneando... */ }
+                    if (patente) verificarPatente(patente.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+                } catch (e) {}
             }, 2000);
         }
 
         async function verificarPatente(patente) {
-            try {
-                const res = await fetch(`http://${IP_DE_LA_COMPU}:3000/verificar-patente?patente=${patente}`);
-                if (res.status === 200) {
-                    const data = await res.json();
-                    document.getElementById('patente-detectada').innerText = "Patente: " + data.patente;
-                    document.getElementById('datos-cliente').innerText = data.nombre;
-                    document.getElementById('resultado').style.display = 'block';
-                    document.getElementById('camara-contenedor').style.display = 'none';
-                    status.style.display = 'none';
-                }
-            } catch (e) {
-                console.log("Error consultando servidor");
-            }
+            const res = await fetch(`http://${IP_DE_LA_COMPU}:3000/verificar-patente?patente=${patente}`);
+            if (res.status === 200) {
+                const data = await res.json();
+                document.getElementById('patente-detectada').innerText = "Patente: " + data.patente;
+                document.getElementById('datos-cliente').innerText = data.nombre;
+                document.getElementById('resultado').style.display = 'block';
+                document.getElementById('camara-contenedor').style.display = 'none';
+            } else { alert("Patente no encontrada."); }
         }
 
         async function finalizar() {
@@ -97,7 +96,7 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ patente: p, monto: m, total: (m * 0.95).toFixed(2) })
             });
-            alert("✅ Carga guardada exitosamente.");
+            alert("✅ Carga guardada.");
             location.reload();
         }
     </script>
