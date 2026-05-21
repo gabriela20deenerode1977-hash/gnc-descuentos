@@ -29,23 +29,28 @@
 
     <div class="panel">
         <h3>Cierre de Turno</h3>
-        <button onclick="realizarCierre()" style="background: #ff4757; color: white;">CALCULAR TOTAL DESCONTADO Y CERRAR</button>
+        <button onclick="realizarCierre()" style="background: #ff4757; color: white;">CALCULAR TOTAL Y CERRAR</button>
     </div>
 
     <script>
-        const IP = "192.168.1.39"; // Ajustá si cambia tu IP
+        const IP = "192.168.1.39";
         const video = document.getElementById('video');
 
         window.addEventListener('load', async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            video.srcObject = stream;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+            } catch (err) { alert("Error de cámara"); }
         });
 
         async function realizarCierre() {
-            const res = await fetch(`http://${IP}:3000/total-descuento-dia`);
-            const data = await res.json();
-            alert("Total descontado en el día: $" + data.total);
-            location.reload();
+            const resTotal = await fetch(`http://${IP}:3000/total-descuento-dia`);
+            const data = await resTotal.json();
+            if (confirm("Total descontado hoy: $" + data.total + ". ¿Confirmar cierre y limpiar historial?")) {
+                await fetch(`http://${IP}:3000/cerrar-turno`);
+                alert("Turno cerrado. Sistema limpio.");
+                location.reload();
+            }
         }
 
         async function verificarPatente(patente) {
