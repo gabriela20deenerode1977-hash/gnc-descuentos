@@ -2,22 +2,25 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Validador GNC - Playero</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validador GNC</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 10px; }
-        .panel { background: #222; padding: 20px; border-radius: 10px; margin-top: 20px; }
-        button { padding: 15px; margin: 5px; cursor: pointer; border-radius: 5px; border: none; }
+        body { font-family: sans-serif; background: #121212; color: white; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+        #camara-contenedor { width: 100%; max-width: 350px; border: 3px solid #00ff00; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+        video { width: 100%; }
+        .panel { width: 100%; max-width: 350px; background: #222; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
+        button { width: 100%; padding: 15px; margin: 5px 0; border-radius: 8px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; }
+        input { width: 90%; padding: 12px; margin: 5px 0; border-radius: 5px; border: none; }
     </style>
 </head>
 <body>
     <h2>⛽ Validador GNC</h2>
-    <div id="camara-contenedor"><video id="video" autoplay playsinline style="width:100%"></video></div>
-    <div id="status-lector">Cargando...</div>
-
-    <div class="input-manual">
+    <div id="camara-contenedor"><video id="video" autoplay playsinline></video></div>
+    
+    <div class="panel">
         <input type="text" id="patente-manual" placeholder="Tipear patente" style="text-transform: uppercase;">
-        <button onclick="buscarManual()">Buscar</button>
+        <button onclick="buscarManual()" style="background:#007bff; color:white;">BUSCAR PATENTE</button>
     </div>
 
     <div id="resultado" class="panel" style="display:none;">
@@ -28,41 +31,28 @@
     </div>
 
     <div class="panel">
-        <h3>Cierre de Turno</h3>
-        <button onclick="realizarCierre()" style="background: #ff4757; color: white;">CALCULAR TOTAL Y CERRAR</button>
+        <button onclick="realizarCierre()" style="background:#ff4757; color:white;">CERRAR TURNO Y LIMPIAR</button>
     </div>
 
     <script>
         const IP = "192.168.1.39";
-        const video = document.getElementById('video');
-
-        window.addEventListener('load', async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                video.srcObject = stream;
-            } catch (err) { alert("Error de cámara"); }
-        });
-
         async function realizarCierre() {
-            const resTotal = await fetch(`http://${IP}:3000/total-descuento-dia`);
-            const data = await resTotal.json();
-            if (confirm("Total descontado hoy: $" + data.total + ". ¿Confirmar cierre y limpiar historial?")) {
+            const res = await fetch(`http://${IP}:3000/total-descuento-dia`);
+            const data = await res.json();
+            if (confirm("Total descontado: $" + data.total + ". ¿Cerrar turno?")) {
                 await fetch(`http://${IP}:3000/cerrar-turno`);
-                alert("Turno cerrado. Sistema limpio.");
                 location.reload();
             }
         }
-
-        async function verificarPatente(patente) {
-            const res = await fetch(`http://${IP}:3000/verificar-patente?patente=${patente}`);
+        async function verificarPatente(p) {
+            const res = await fetch(`http://${IP}:3000/verificar-patente?patente=${p}`);
             if (res.status === 200) {
                 const data = await res.json();
                 document.getElementById('patente-detectada').innerText = "Patente: " + data.patente;
                 document.getElementById('datos-cliente').innerText = data.nombre;
                 document.getElementById('resultado').style.display = 'block';
-            } else { alert("No registrado"); }
+            } else { alert("No encontrado"); }
         }
-
         async function finalizar() {
             const p = document.getElementById('patente-detectada').innerText.replace("Patente: ", "");
             const m = document.getElementById('monto').value;
@@ -71,14 +61,11 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ patente: p, monto: m, total: (m * 0.95).toFixed(2) })
             });
-            alert("✅ Carga guardada.");
+            alert("Carga guardada.");
             location.reload();
         }
-
-        function buscarManual() {
-            const p = document.getElementById('patente-manual').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-            if(p) verificarPatente(p);
-        }
+        function buscarManual() { verificarPatente(document.getElementById('patente-manual').value); }
+        navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}}).then(s => document.getElementById('video').srcObject = s);
     </script>
 </body>
 </html>
