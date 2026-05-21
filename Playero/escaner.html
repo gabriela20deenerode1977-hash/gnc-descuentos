@@ -54,7 +54,8 @@
     </div>
 
     <script>
-        const IP_DE_LA_COMPU = "192.168.1.96"; 
+        // ¡ACTUALIZADO! IP real de la computadora de la caja hoy
+        const IP_DE_LA_COMPU = "192.168.1.39"; 
 
         let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
 
@@ -92,14 +93,14 @@
             cargasDelTurno.push({ fecha, patente, monto: monto.toFixed(2), descuento: descuentoPesos, total });
             localStorage.setItem('cargas_turno', JSON.stringify(cargasDelTurno));
 
-            // ¡SOLUCIÓN AQUÍ! Ahora sí le pasamos el campo "fecha" que el servidor de la caja exige para guardarlo en la base general
+            // Envío con la IP corregida y la fecha incluida para el servidor de la caja
             fetch(`http://${IP_DE_LA_COMPU}:3000/guardar-carga`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fecha, patente, monto, total })
             })
-            .then(res => console.log("Copia guardada de forma completa en el servidor."))
-            .catch(err => console.error("Error al enviar la carga a la base central:", err));
+            .then(res => console.log("Copia guardada exitosamente en el servidor central."))
+            .catch(err => console.error("Error de red. No se pudo conectar con la IP de la caja:", err));
 
             alert("✅ Carga registrada.");
             location.reload();
