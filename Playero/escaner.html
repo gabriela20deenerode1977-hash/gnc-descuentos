@@ -21,17 +21,31 @@
         th, td { border: 1px solid #333; padding: 12px; text-align: center; }
         th { background: #2d2d2d; color: #00ff00; }
         #status-lector { margin: 10px; color: #ffc107; font-weight: bold; }
+        
+        /* Nuevo estilo para la sección manual */
+        .carga-manual-contenedor { margin: 20px auto; max-width: 500px; padding: 10px; background: #1a1a1a; border-radius: 8px; border: 1px dashed #333; }
+        .carga-manual-contenedor input { width: 60%; padding: 10px; font-size: 16px; margin-right: 5px; }
+        .carga-manual-contenedor button { padding: 10px 20px; font-size: 16px; margin: 0; vertical-align: middle; }
     </style>
 </head>
 <body>
     <h2>⛽ Validador GNC</h2>
     
-    <div id="camara-contenedor">
-        <video id="video" autoplay playsinline></video>
-        <div class="guia-patente"></div>
-        <div class="texto-guia">Encuadre la patente aquí</div>
+    <div id="seccion-lectura">
+        <div id="camara-contenedor">
+            <video id="video" autoplay playsinline></video>
+            <div class="guia-patente"></div>
+            <div class="texto-guia">Encuadre la patente aquí</div>
+        </div>
+        <div id="status-lector">Iniciando cámara...</div>
+
+        <!-- NUEVA OPCIÓN: Ingreso Manual de Patente -->
+        <div class="carga-manual-contenedor">
+            <p style="margin: 0 0 10px 0; font-size: 14px; color: #aaa;">¿No lee la patente? Ingrese manualmente:</p>
+            <input type="text" id="patente-manual" placeholder="ABC123 o AE123BB" style="text-transform: uppercase;">
+            <button onclick="procesarPatenteManual()">Validar</button>
+        </div>
     </div>
-    <div id="status-lector">Iniciando cámara...</div>
 
     <div id="resultado" class="resultado">
         <h3 id="patente-detectada"></h3>
@@ -123,6 +137,23 @@
             }
         }
 
+        /* NUEVA FUNCIÓN: Procesa el click del botón manual */
+        function procesarPatenteManual() {
+            const inputManual = document.getElementById('patente-manual');
+            const patenteLimpia = filtrarPatenteArgentina(inputManual.value);
+
+            if (!patenteLimpia) {
+                alert("❌ Formato de patente inválido. Ingrese una patente argentina válida (AAA111 o AA111AA).");
+                return;
+            }
+
+            // Frena el bucle del escáner automático para que no interfiera
+            clearInterval(intervaloEscaneo);
+            
+            // Envía la patente ingresada a mano al mismo validador del servidor
+            verificarClienteServidor(patenteLimpia);
+        }
+
         function verificarClienteServidor(patente) {
             document.getElementById('status-lector').innerText = "🔍 Verificando cliente en la base central...";
             
@@ -148,8 +179,8 @@
                     document.getElementById('datos-cliente').innerText = `👤 Cliente: ${cliente.nombre || 'Registrado OK'}`;
                     
                     document.getElementById('resultado').style.display = 'block';
-                    document.getElementById('camara-contenedor').style.display = 'none';
-                    document.getElementById('status-lector').style.display = 'none';
+                    // Ocultamos todo el bloque de lectura (cámara y carga manual)
+                    document.getElementById('seccion-lectura').style.display = 'none';
                 }
             })
             .catch(err => {
