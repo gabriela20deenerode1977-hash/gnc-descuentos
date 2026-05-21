@@ -7,9 +7,11 @@
     <style>
         body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 20px; }
         #camara-contenedor { width: 100%; max-width: 500px; margin: auto; border: 2px solid #00ff00; }
+        video { width: 100%; }
         .resultado { background: #222; padding: 20px; margin-top: 20px; display: none; }
-        #datos-cliente { color: #ffc107; font-weight: bold; margin: 10px 0; }
-        button { background: #00ff00; padding: 15px; border-radius: 5px; cursor: pointer; }
+        #datos-cliente { color: #ffc107; font-weight: bold; margin: 10px 0; font-size: 1.2em; }
+        input { width: 80%; padding: 15px; font-size: 20px; border-radius: 5px; }
+        button { background: #00ff00; padding: 15px 30px; font-weight: bold; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -20,32 +22,55 @@
     <div id="resultado" class="resultado">
         <h3 id="patente-detectada"></h3>
         <div id="datos-cliente"></div>
-        <input type="number" id="monto" placeholder="Monto">
+        <input type="number" id="monto" placeholder="Monto cargado">
+        <br><br>
         <button onclick="finalizar()">Confirmar Carga</button>
     </div>
 
+    <canvas id="canvas" style="display:none;"></canvas>
+
     <script>
         const IP_DE_LA_COMPU = "192.168.1.39"; 
+        const video = document.getElementById('video');
+        
+        // 1. Iniciar cámara
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(s => video.srcObject = s);
 
-        async function verificarPatente(patente) {
-            try {
-                const response = await fetch(`http://${IP_DE_LA_COMPU}:3000/verificar-patente?patente=${patente}`);
-                if (response.status === 404) {
-                    alert("❌ PATENTE NO REGISTRADA");
-                    location.reload();
-                    return;
+        // 2. Escanear
+        setInterval(() => {
+            const canvas = document.getElementById('canvas');
+            canvas.getContext('2d').drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+            Tesseract.recognize(canvas, 'eng').then(({ data: { text } }) => {
+                const p = (text.match(/[A-Z]{2,3}[0-9]{3}[A-Z]{0,2}/) || [])[0];
+                if (p && p.length > 5) {
+                    verificarPatente(p.replace(/[^A-Z0-9]/g, ''));
                 }
-                const data = await response.json();
-                document.getElementById('patente-detectada').innerText = "Vehículo: " + data.patente;
-                document.getElementById('datos-cliente').innerText = "👤 " + data.nombre;
+            });
+        }, 3000);
+
+        async function verificarPatente(p) {
+            const res = await fetch(`http://${IP_DE_LA_COMPU}:3000/verificar-patente?patente=${p}`);
+            if (res.status === 200) {
+                const data = await res.json();
+                document.getElementById('patente-detectada').innerText = "Patente: " + data.patente;
+                document.getElementById('datos-cliente').innerText = data.nombre;
                 document.getElementById('resultado').style.display = 'block';
                 document.getElementById('camara-contenedor').style.display = 'none';
-            } catch (e) {
-                alert("Error de conexión con la caja.");
+                document.getElementById('status-lector').style.display = 'none';
             }
         }
-        
-        // (Aquí iría la lógica de Tesseract que ya tenías para llamar a verificarPatente(patenteLimpia))
+
+        async function finalizar() {
+            const p = document.getElementById('patente-detectada').innerText.replace("Patente: ", "");
+            const m = document.getElementById('monto').value;
+            await fetch(`http://${IP_DE_LA_COMPU}:3000/guardar-carga`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ patente: p, monto: m, total: m * 0.95 })
+            });
+            alert("Carga guardada");
+            location.reload();
+        }
     </script>
 </body>
 </html>
