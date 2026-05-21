@@ -2,245 +2,50 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Validador GNC - Playero</title>
     <script src="https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; margin: 0; }
-        #camara-contenedor { width: 100%; max-width: 500px; margin: auto; position: relative; border: 2px solid #00ff00; border-radius: 8px; overflow: hidden; background: #000; }
-        video { width: 100%; height: auto; display: block; }
-        .guia-patente { position: absolute; top: 35%; left: 10%; width: 80%; height: 30%; border: 2px dashed #00ff00; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); pointer-events: none; box-sizing: border-box; }
-        .texto-guia { position: absolute; bottom: 10px; left: 0; width: 100%; color: #00ff00; font-size: 14px; font-weight: bold; text-shadow: 1px 1px 2px black; }
-        .resultado { background: #222; padding: 20px; border-radius: 10px; margin-top: 20px; display: none; }
-        input { width: 80%; padding: 15px; font-size: 20px; margin: 10px 0; border-radius: 5px; border: none; text-align: center; }
-        button { background: #00ff00; color: black; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 5px; cursor: pointer; margin: 10px; }
-        .btn-descarga { background: #ffc107; color: black; width: 100%; max-width: 400px; font-size: 20px; padding: 20px; margin-top: 30px; border-radius: 10px; font-weight: bold; border: none; cursor: pointer; }
-        .monto-final { color: #00ff00; font-size: 30px; font-weight: bold; }
-        .tabla-contenedor { max-width: 700px; margin: 30px auto; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; background: #1e1e1e; }
-        th, td { border: 1px solid #333; padding: 12px; text-align: center; }
-        th { background: #2d2d2d; color: #00ff00; }
-        #status-lector { margin: 10px; color: #ffc107; font-weight: bold; }
+        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding: 20px; }
+        #camara-contenedor { width: 100%; max-width: 500px; margin: auto; border: 2px solid #00ff00; }
+        .resultado { background: #222; padding: 20px; margin-top: 20px; display: none; }
+        #datos-cliente { color: #ffc107; font-weight: bold; margin: 10px 0; }
+        button { background: #00ff00; padding: 15px; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
     <h2>⛽ Validador GNC</h2>
-    
-    <div id="camara-contenedor">
-        <video id="video" autoplay playsinline></video>
-        <div class="guia-patente"></div>
-        <div class="texto-guia">Encuadre la patente aquí</div>
-    </div>
+    <div id="camara-contenedor"><video id="video" autoplay playsinline></video></div>
     <div id="status-lector">Iniciando cámara...</div>
 
     <div id="resultado" class="resultado">
         <h3 id="patente-detectada"></h3>
-        <p>Monto cargado ($):</p>
-        <input type="number" id="monto" placeholder="Ej: 4000" oninput="calcular()">
-        <div class="monto-final">Total a Cobrar: $<span id="total">0</span></div>
-        <p style="color: #aaa;">Descuento 5% aplicado</p>
-        <br>
+        <div id="datos-cliente"></div>
+        <input type="number" id="monto" placeholder="Monto">
         <button onclick="finalizar()">Confirmar Carga</button>
     </div>
 
-    <div class="tabla-contenedor">
-        <h3>📋 Cargas del Turno Actual</h3>
-        <table id="tabla-cargas">
-            <thead>
-                <tr>
-                    <th>Fecha/Hora</th>
-                    <th>Patente</th>
-                    <th>Monto Base</th>
-                    <th>Descuento ($)</th>
-                    <th>Total Cobrado</th>
-                </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
-
-        <button class="btn-descarga" onclick="descargarYFecharTurno()">📥 DESCARGAR EXCEL Y CERRAR TURNO</button>
-    </div>
-
-    <canvas id="canvas" style="display:none;"></canvas>
-
     <script>
         const IP_DE_LA_COMPU = "192.168.1.39"; 
-        let cargasDelTurno = JSON.parse(localStorage.getItem('cargas_turno')) || [];
-        let videoStream = null;
-        let intervaloEscaneo = null;
 
-        actualizarTabla();
-        iniciarCamara();
-
-        // 1. Encender la cámara trasera del celular
-        function iniciarCamara() {
-            const video = document.getElementById('video');
-            navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, 
-                audio: false 
-            })
-            .then(stream => {
-                videoStream = stream;
-                video.srcObject = stream;
-                document.getElementById('status-lector').innerText = "Buscando patente...";
-                // Empezamos a escanear de forma automática cada 2 segundos
-                intervaloEscaneo = setInterval(escanearTextoPatente, 2000);
-            })
-            .catch(err => {
-                console.error("Error de cámara:", err);
-                document.getElementById('status-lector').innerText = "❌ Error al acceder a la cámara.";
-            });
-        }
-
-        // 2. Capturar fotograma y procesarlo con OCR
-        function escanearTextoPatente() {
-            const video = document.getElementById('video');
-            const canvas = document.getElementById('canvas');
-            const ctx = canvas.getContext('2d');
-
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                document.getElementById('status-lector').innerText = "Leyendo... mantenga firme.";
-
-                // Le pasamos la captura a Tesseract
-                Tesseract.recognize(canvas, 'eng', { logger: m => console.log(m.progress) })
-                .then(({ data: { text } }) => {
-                    const patenteLimpia = filtrarPatenteArgentina(text);
-                    
-                    if (patenteLimpia) {
-                        clearInterval(intervaloEscaneo); // Frenamos el bucle de lectura
-                        apagarCamara();
-                        
-                        document.getElementById('patente-detectada').innerText = "Vehículo: " + patenteLimpia;
-                        document.getElementById('resultado').style.display = 'block';
-                        document.getElementById('camara-contenedor').style.display = 'none';
-                        document.getElementById('status-lector').style.display = 'none';
-                    } else {
-                        document.getElementById('status-lector').innerText = "Buscando patente...";
-                    }
-                })
-                .catch(err => console.error("Error en OCR:", err));
+        async function verificarPatente(patente) {
+            try {
+                const response = await fetch(`http://${IP_DE_LA_COMPU}:3000/verificar-patente?patente=${patente}`);
+                if (response.status === 404) {
+                    alert("❌ PATENTE NO REGISTRADA");
+                    location.reload();
+                    return;
+                }
+                const data = await response.json();
+                document.getElementById('patente-detectada').innerText = "Vehículo: " + data.patente;
+                document.getElementById('datos-cliente').innerText = "👤 " + data.nombre;
+                document.getElementById('resultado').style.display = 'block';
+                document.getElementById('camara-contenedor').style.display = 'none';
+            } catch (e) {
+                alert("Error de conexión con la caja.");
             }
         }
-
-        // 3. Filtro inteligente para validar formatos de patente válidos (Viejas y Mercosur)
-        function filtrarPatenteArgentina(texto) {
-            // Limpiamos espacios, guiones y dejamos todo en mayúsculas
-            let limpio = texto.toUpperCase().replace(/[^A-Z0-9]/g, "");
-
-            // Buscamos patrones de patentes comunes adentro del texto reconocido:
-            // Formato Mercosur nuevo (AA123BB) o formato viejo (AAA123)
-            const regexMercosur = /[A-Z]{2}[0-9]{3}[A-Z]{2}/;
-            const regexVieja = /[A-Z]{3}[0-9]{3}/;
-
-            let coincidencia = limpio.match(regexMercosur) || limpio.match(regexVieja);
-            return coincidencia ? coincidencia[0] : null;
-        }
-
-        function apagarCamara() {
-            if (videoStream) {
-                videoStream.getTracks().forEach(track => track.stop());
-            }
-        }
-
-        function calcular() {
-            let monto = document.getElementById('monto').value;
-            let total = monto * 0.95;
-            document.getElementById('total').innerText = total.toFixed(2);
-        }
-
-        function finalizar() {
-            const patente = document.getElementById('patente-detectada').innerText.replace("Vehículo: ", "");
-            const monto = parseFloat(document.getElementById('monto').value);
-
-            if (!monto || monto <= 0) {
-                alert("Por favor, ingresa un monto válido.");
-                return;
-            }
-
-            const fecha = new Date().toLocaleString();
-            const descuentoPesos = (monto * 0.05).toFixed(2);
-            const total = (monto * 0.95).toFixed(2);
-
-            cargasDelTurno.push({ fecha, patente, monto: monto.toFixed(2), descuento: descuentoPesos, total });
-            localStorage.setItem('cargas_turno', JSON.stringify(cargasDelTurno));
-
-            fetch(`http://${IP_DE_LA_COMPU}:3000/guardar-carga`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fecha, patente, monto, total })
-            })
-            .then(res => console.log("Copia guardada exitosamente en el servidor central."))
-            .catch(err => console.error("Error de red con la caja:", err));
-
-            alert("✅ Carga registrada.");
-            location.reload();
-        }
-
-        function actualizarTabla() {
-            const tbody = document.querySelector('#tabla-cargas tbody');
-            tbody.innerHTML = '';
-            cargasDelTurno.forEach(carga => {
-                const fila = `<tr>
-                    <td>${carga.fecha}</td>
-                    <td>${carga.patente}</td>
-                    <td>$${carga.monto}</td>
-                    <td>$${carga.descuento}</td>
-                    <td>$${carga.total}</td>
-                </tr>`;
-                tbody.innerHTML += fila;
-            });
-        }
-
-        function descargarYFecharTurno() {
-            if (cargasDelTurno.length === 0) {
-                alert("No hay cargas registradas en este turno.");
-                return;
-            }
-
-            let nombreSugerido = "Turno_GNC_" + new Date().toISOString().slice(0,10);
-            let nombreArchivo = prompt("Escribe el nombre para el archivo Excel:", nombreSugerido);
-            
-            if (nombreArchivo === null) return; 
-            if (nombreArchivo.trim() === "") {
-                nombreArchivo = nombreSugerido;
-            }
-
-            let sumaMontoBase = 0;
-            let sumaDescuentos = 0;
-            let sumaTotales = 0;
-
-            let contenidoCsv = "sep=,\nFecha y Hora,Patente,Monto Base,Descuento ($),Total Cobrado\n";
-            
-            cargasDelTurno.forEach(c => {
-                contenidoCsv += `"${c.fecha}","${c.patente}","${c.monto}","${c.descuento}","${c.total}"\n`;
-                sumaMontoBase += parseFloat(c.monto);
-                sumaDescuentos += parseFloat(c.descuento);
-                sumaTotales += parseFloat(c.total);
-            });
-
-            contenidoCsv += `\n`;
-            contenidoCsv += `"TOTALES DEL TURNO","","${sumaMontoBase.toFixed(2)}","${sumaDescuentos.toFixed(2)}","${sumaTotales.toFixed(2)}"\n`;
-
-            let blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), contenidoCsv], { type: 'text/csv;charset=utf-8;' });
-            let link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", `${nombreArchivo.trim()}.csv`);
-            document.body.appendChild(link);
-            
-            link.click();
-            document.body.removeChild(link);
-
-            localStorage.removeItem('cargas_turno');
-            cargasDelTurno = [];
-            
-            alert("🔒 Turno cerrado con éxito. Los datos se han limpiado para el siguiente turno.");
-            location.reload();
-        }
+        
+        // (Aquí iría la lógica de Tesseract que ya tenías para llamar a verificarPatente(patenteLimpia))
     </script>
 </body>
 </html>
