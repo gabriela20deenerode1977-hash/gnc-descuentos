@@ -1,5 +1,6 @@
 const express = require('express');
 const fs = require('fs').promises; // Módulo de archivos asíncrono
+const fsSincrono = require('fs'); // Usado para operaciones rápidas o lectura síncrona
 const { existsSync } = require('fs'); // Chequeo rápido de archivos
 const path = require('path');
 const cors = require('cors'); 
@@ -11,6 +12,69 @@ app.use(cors());
 app.use(express.json());
 
 const ARCHIVO_CSV = path.join(__dirname, 'registro_cargas.csv');
+
+// =========================================================================
+// NUEVO ENDPOINT: VERIFICA SI LA PATENTE ESCANEADA EXISTE EN EL CLI.TXT
+// =========================================================================
+app.get('/verificar-patente', (req, res) => {
+    try {
+        if (!req.query.patente) {
+            return res.status(400).send("Falta el parámetro patente");
+        }
+
+        // Tomamos la patente detectada por el celu y le borramos todos los espacios intermedios
+        const patenteBuscada = req.query.patente.toUpperCase().replace(/\s+/g, '').trim();
+        
+        // Ruta física al archivo CLI.TXT en la misma carpeta del servidor
+        const rutaTxt = path.join(__dirname, 'CLI.TXT'); 
+
+        // 1. Verificamos si el archivo realmente existe en la carpeta
+        if (!fsSincrono.existsSync(rutaTxt)) {
+            console.error("❌ Error: No se encontró el archivo CLI.TXT en la carpeta raíz.");
+            return res.status(500).send("Error interno: Base de datos CLI.TXT ausente.");
+        }
+
+        // 2. Leemos todo el contenido de CLI.TXT
+        const contenido = fsSincrono.readFileSync(rutaTxt, 'utf-8');
+        
+        // 3. Separamos el archivo renglón por renglón
+        const lineas = contenido.split('\n');
+
+        let clienteEncontrado = null;
+
+        // 4. Recorremos el archivo renglón por renglón buscando coincidencias
+        for (let linea of lineas) {
+            if (!linea.trim()) continue; // Salteamos líneas vacías
+
+            // Pasamos la línea a mayúsculas y removemos todos los espacios para cruzar datos sin fallas
+            const lineaLimpiaParaBuscar = linea.toUpperCase().replace(/\s+/g, '');
+
+            if (lineaLimpiaParaBuscar.includes(patenteBuscada)) {
+                // Al encontrarla, removemos espacios gigantes consecutivos del renglón original para el celular
+                const datosProlijos = linea.replace(/\s+/g, ' ').trim();
+
+                clienteEncontrado = {
+                    patente: req.query.patente.toUpperCase().trim(),
+                    nombre: datosProlijos // Enviamos la línea completa procesada (Código, Patente, Celular, etc.)
+                };
+                break;
+            }
+        }
+
+        // 5. Respondemos al celular del playero
+        if (clienteEncontrado) {
+            console.log(`✅ Patente autorizada encontrada: ${patenteBuscada}`);
+            res.status(200).json(clienteEncontrado);
+        } else {
+            console.log(`❌ Intento de carga con patente NO registrada: ${patenteBuscada}`);
+            res.status(404).send("Cliente no registrado");
+        }
+
+    } catch (error) {
+        console.error("Error al verificar la patente en CLI.TXT:", error);
+        res.status(500).send("Error interno al procesar la patente.");
+    }
+});
 
 // 1. RECIBE LOS DATOS DEL CELULAR DEL PLAYERO
 app.post('/guardar-carga', async (req, res) => {
@@ -40,22 +104,18 @@ app.post('/guardar-carga', async (req, res) => {
 });
 
 // 2. GENERA Y DESCARGA EL REPORTE EN EXCEL FILTRADO POR PERÍODO
-// Ejemplo de uso: /descargar-reporte?desde=2026-05-01&hasta=2026-05-15
 app.get('/descargar-reporte', async (req, res) => {
     if (!existsSync(ARCHIVO_CSV)) return res.status(404).send("No hay datos para generar el reporte.");
     
-    // Capturamos las fechas que vienen desde la web (formato AAAA-MM-DD)
     const { desde, hasta } = req.query;
 
     try {
         const contenido = await fs.readFile(ARCHIVO_CSV, 'utf8');
         const lineas = contenido.split('\n');
 
-        // Inicializar el libro de Excel
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Reporte Cargas GNC');
 
-        // Configurar títulos y anchos de columnas
         worksheet.columns = [
             { header: 'Fecha', key: 'fecha', width: 15 },
             { header: 'Hora', key: 'hora', width: 12 },
@@ -65,28 +125,24 @@ app.get('/descargar-reporte', async (req, res) => {
             { header: 'Total Cobrado', key: 'total', width: 18 }
         ];
 
-        // Diseño del Encabezado (Azul marino corporativo y texto blanco)
         worksheet.getRow(1).font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFF' } };
         worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '1F497D' } };
         worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
 
         let totalFilas = 0;
 
-        // Variables para convertir los filtros a formato Fecha para comparar de forma segura
         const filtroDesde = desde ? new Date(desde.replace(/-/g, '/')) : null;
         const filtroHasta = hasta ? new Date(hasta.replace(/-/g, '/')) : null;
 
-        // Leer los datos históricos e filtrarlos fila por fila
         for (let i = 2; i < lineas.length; i++) {
             if (!lineas[i].trim()) continue;
             
             const columnas = lineas[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(col => col.replace(/"/g, '').trim());
             
             if (columnas.length >= 6) {
-                const fechaCargaStr = columnas[0]; // AAAA-MM-DD
+                const fechaCargaStr = columnas[0]; 
                 const fechaCargaObj = new Date(fechaCargaStr.replace(/-/g, '/'));
 
-                // Aplicamos el filtro de "Periodo" si fue enviado desde la web
                 if (filtroDesde && fechaCargaObj < filtroDesde) continue;
                 if (filtroHasta && fechaCargaObj > filtroHasta) continue;
 
@@ -100,12 +156,10 @@ app.get('/descargar-reporte', async (req, res) => {
                     total: parseFloat(columnas[5])
                 });
 
-                // Alineación de textos
                 filaNueva.getCell('fecha').alignment = { horizontal: 'center' };
                 filaNueva.getCell('hora').alignment = { horizontal: 'center' };
                 filaNueva.getCell('patente').alignment = { horizontal: 'center' };
                 
-                // Formato de moneda
                 filaNueva.getCell('monto').numFmt = '"$"#,##0.00';
                 filaNueva.getCell('descuento').numFmt = '"$"#,##0.00';
                 filaNueva.getCell('total').numFmt = '"$"#,##0.00';
@@ -116,7 +170,6 @@ app.get('/descargar-reporte', async (req, res) => {
             return res.status(444).send("No se encontraron cargas en el rango de fechas seleccionado.");
         }
 
-        // Agregar fila automática de TOTALES (Fórmulas SUM) al final
         const filaTotal = worksheet.addRow({
             fecha: 'TOTALES',
             hora: '',
@@ -136,7 +189,6 @@ app.get('/descargar-reporte', async (req, res) => {
             bottom: { style: 'double' }
         };
 
-        // Nombre del archivo dinámico según el periodo elegido
         const nombreArchivo = (desde && hasta) ? `Reporte_GNC_${desde}_a_${hasta}.xlsx` : 'Reporte_Oficial_GNC.xlsx';
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -176,34 +228,4 @@ app.get('/ahorro-cliente/:patente', async (req, res) => {
             
             if (columnas.length >= 6) {
                 const fechaCarga = columnas[0]; 
-                const patenteCarga = columnas[2].toUpperCase();
-                const descCarga = parseFloat(columnas[4]) || 0;
-                const totalCarga = parseFloat(columnas[5]) || 0;
-
-                const fechaObjeto = new Date(fechaCarga.replace(/-/g, '/'));
-
-                if (patenteCarga === patenteBuscada && fechaObjeto >= hace7Dias) {
-                    totalAhorrado += descCarga;
-                    historial.push({
-                        fecha: fechaCarga,
-                        ahorro: descCarga.toFixed(2),
-                        total: totalCarga.toFixed(2)
-                    });
-                }
-            }
-        }
-
-        res.json({
-            patente: patenteBuscada,
-            totalAhorrado: totalAhorrado.toFixed(2),
-            historial: historial.reverse() 
-        });
-    } catch (error) {
-        console.error("Error en la consulta:", error);
-        res.status(500).json({ error: "Error en la consulta" });
-    }
-});
-
-app.listen(3000, () => {
-    console.log("⛽ Servidor GNC activo con filtro por período en el puerto 3000");
-});
+                const patenteCarga = columnas
