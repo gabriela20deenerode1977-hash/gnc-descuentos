@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html>
 <body>
-    <h1>Reporte de Ventas</h1>
-    <button onclick="descargar()">Descargar Reporte</button>
-    <pre id="lista"></pre>
+    <h1>Reporte Admin</h1>
+    <button onclick="cargar()">Ver Reporte Actual</button>
+    <pre id="display"></pre>
     <script>
-        async function descargar() {
+        async function cargar() {
             const res = await fetch('http://192.168.1.39:3000/reporte');
-            const texto = await res.text();
-            document.getElementById('lista').innerText = texto;
+            document.getElementById('display').innerText = await res.text();
         }
     </script>
 </body>

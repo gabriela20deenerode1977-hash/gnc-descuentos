@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <video id="video" autoplay playsinline style="width:100%"></video>
+    <hr>
+    <input type="text" id="p" placeholder="Patente">
+    <input type="number" id="m" placeholder="Monto">
+    <button onclick="guardar()">Cargar Venta</button>
+    <button onclick="cierre()" style="background:red; color:white;">Cierre de Turno</button>
+    
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+    <script>
+        async function guardar() {
+            const p = document.getElementById('p').value;
+            const m = document.getElementById('m').value;
+            await fetch('http://192.168.1.39:3000/guardar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({patente: p, monto: m})
+            });
+            alert("Carga realizada");
+        }
+        async function cierre() {
+            if(confirm("¿Segura que quieres cerrar el turno?")) {
+                await fetch('http://192.168.1.39:3000/cierre', {method: 'POST'});
+                alert("Turno cerrado");
+            }
+        }
+        // ... (Tu lógica de Tesseract que ya funcionaba)
+    </script>
+</body>
+</html>
